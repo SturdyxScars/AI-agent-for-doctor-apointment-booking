@@ -141,30 +141,12 @@ Pass the **same `ctx`** into each call to maintain conversation memory.
 
 ---
 
-# **7. Optional: Run with Streamlit (Locally Only)**
-
-Create file `app.py`:
-
-```python
-import streamlit as st
-from conversational_agent_patched import conversational_run_agent
-
-st.title("Local Appointment Agent (Ollama + Google Calendar)")
-
-if "ctx" not in st.session_state:
-    st.session_state.ctx = {"pending_action": None, "args": {}, "history": [], "available_slots": []}
-
-user_input = st.text_input("You:")
-if st.button("Send"):
-    reply, ctx = conversational_run_agent(user_input, st.session_state.ctx)
-    st.session_state.ctx = ctx
-    st.write(reply)
-```
+# **7.Run with Streamlit (Locally)**
 
 Run:
 
 ```bash
-streamlit run app.py
+streamlit run stream_run.py
 ```
 
 > **Note:** Streamlit Cloud cannot access your local Ollama.
@@ -188,14 +170,6 @@ streamlit run app.py
 └── README.md
 
 ```
-
----
-
-# **🔐 Security Notes**
-
-* Never commit `client_secret.json`.
-* Never expose local Ollama to the internet without protection.
-* Keep `.env` and credentials out of the repo.
 
 ---
 
@@ -223,7 +197,6 @@ Perfect for:
 * building medical/clinic automation prototypes
 
 ---
-[! watch the demo]
 https://github.com/user-attachments/assets/058340ee-cccc-48b3-8c95-0cbf9cd90ca6
 * The demo was performed by opening Google Calendar without the location, therefore the timeline alter, otherwise if you open your phone and check, the appointment is booked for the right slot
 
