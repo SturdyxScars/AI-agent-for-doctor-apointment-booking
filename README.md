@@ -159,7 +159,7 @@ streamlit run last_stream.py
 ```
 📁 project/
 │
-├── conversational_agent.py        # Main conversational agent (LLM + rules + calendar logic)
+├── run.py        # Main conversational agent (LLM + rules + calendar logic)
 ├── calendar_functions.py          # Calendar helper utilities (find slot logic, booking helpers)
 ├── google_apis.py                 # Google Calendar API service construction + auth handling
 ├── stream_run.py                  # Optional Streamlit UI to run the agent locally
@@ -197,6 +197,10 @@ Perfect for:
 * building medical/clinic automation prototypes
 
 ---
-https://github.com/user-attachments/assets/058340ee-cccc-48b3-8c95-0cbf9cd90ca6
+
+
+https://github.com/user-attachments/assets/e3049e47-8350-496a-b0b3-6c78afa1bf16
+
+
 * The demo was performed by opening Google Calendar without the location access with a VPN, therefore the timeline alters, otherwise if you open your phone and check, the appointment is booked for the right slot
 
