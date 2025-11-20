@@ -223,3 +223,5 @@ Perfect for:
 * building medical/clinic automation prototypes
 
 ---
+[! watch video]
+(https://drive.google.com/file/d/1z4FXDycZGvc37e1r4xk8lhGgqlllTN0i/view?usp=sharing)
