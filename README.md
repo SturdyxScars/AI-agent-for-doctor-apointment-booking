@@ -146,7 +146,7 @@ Pass the **same `ctx`** into each call to maintain conversation memory.
 Run:
 
 ```bash
-streamlit run stream_run.py
+streamlit run last_stream.py
 ```
 
 > **Note:** Streamlit Cloud cannot access your local Ollama.
