@@ -223,3 +223,7 @@ Perfect for:
 * building medical/clinic automation prototypes
 
 ---
+[! watch the demo]
+https://github.com/user-attachments/assets/058340ee-cccc-48b3-8c95-0cbf9cd90ca6
+* The demo was performed by opening Google Calendar without the location, therefore the timeline alter, otherwise if you open your phone and check, the appointment is booked for the right slot
+
