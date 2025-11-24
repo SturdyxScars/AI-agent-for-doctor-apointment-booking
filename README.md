@@ -1,206 +1,169 @@
-# **Conversational Medical Appointment Agent**
+# Doctor Booking Agent
 
-A fully local conversational agent that finds available calendar slots and books medical appointments using:
-
-* **Ollama** (running locally) with **Llama 3.2**
-* **Google Calendar API**
-* **Python (LangChain + custom rule-based logic)**
-
-This project runs **entirely on your machine**. No cloud LLMs required.
+A lightweight conversational booking agent for scheduling appointments with a doctor's Google Calendar. Built around an LLM assistant (OllamaLLM in the example) and utility functions that integrate with Google Calendar.
 
 ---
 
-## **🔧 Features**
+## Quick summary
 
-* Natural language conversation for scheduling.
-* Local Llama 3.2 model via Ollama → fast, private inference.
-* Automatically:
-
-  * Detects user intent.
-  * Extracts dates, times, names.
-  * Searches Google Calendar for available slots.
-  * Books appointments with confirmation.
-* Robust rule-based fallback → avoids LLM hallucinations.
-* Debug-friendly (prints LLM output + exceptions for calendar logic).
+* Purpose: Let patients/conversational users check availability and book appointments via natural language.
+* Core idea: Use an LLM to parse user intent and dates/times, then call deterministic helper functions to query Google Calendar and create events.
+* Minimal dependencies: an LLM client, `googleapiclient`-style calendar helpers, and a small Streamlit UI for demonstrations.
 
 ---
 
-# **🖥️ Run Locally (Step-by-Step)**
+## Folder structure
 
-## **1. Clone the Repository**
+```
+- Booking_Agent.py        # conversational workflow and state-machine for booking
+- calendar_functions.py   # Google Calendar helper functions (query/free slots/create event)
+- google_apis.py          # OAuth helper for doctor to create & store credentials
+- doctor-agent-UI.py      # Streamlit UI that shows chat and lets users choose time slots
+- LLM_prompts.py         # prompts and system instructions used by the LLM
+```
+
+---
+
+## Installation
+
+1. Create a Python virtual environment and activate it.
 
 ```bash
-git clone https://github.com/<your-username>/<project-name>.git
-cd <project-name>
+python -m venv venv
+source venv/bin/activate  # macOS / Linux
+venv\Scripts\activate     # Windows
 ```
 
----
-
-## **2. Install Python & Create Virtual Environment**
+2. Install required packages (example list — adjust to your project):
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate     # macOS / Linux
-.venv\Scripts\activate        # Windows
+pip install langchain_ollama google-auth google-auth-oauthlib google-api-python-client streamlit python-dateutil
 ```
+
+3. Place your Google Cloud `client_secret.json` (OAuth 2.0 credentials) in the project root or a secure folder. See **Google API Setup** below.
 
 ---
 
-## **3. Install Dependencies**
+## Google API setup (doctor / calendar owner)
+
+1. Go to Google Cloud Console → APIs & Services → Credentials.
+2. Create OAuth 2.0 Client ID for a "Desktop" or "Web" application depending on your deployment.
+3. Download `client_secret.json` and save it in the project root (or update the path in code).
+4. Run the OAuth helper flow in `google_apis.py` to generate and store the token/credentials the first time.
+
+> `calendar_service = construct_calendar_service("client_secret.json")` in `Booking_Agent.py` expects `construct_calendar_service` to return an authorized `service` object for Calendar API calls.
+
+---
+
+## How the BookingAgent works (high level)
+
+`Booking_Agent.py` implements a simple state machine that orchestrates conversational booking.
+
+States:
+
+* `idle`: Default. Waits for user input and detects whether it's a scheduling request.
+* `awaiting_date`: A scheduling request has been detected. The agent attempts to parse a date (via LLM or heuristics) and will call `find_free_slots_for_date`.
+* `slots_found`: Available time slots have been retrieved and presented to the user; agent awaits slot selection.
+* `booking-details`: (implicit) After a slot is selected, the agent gathers patient details (name, reason) if needed.
+* `completed`: Appointment created and agent resets.
+
+Key pieces:
+
+* `self.FUNCTIONS`: deterministic helper functions the LLM can ask to call: `parse_date`, `get_current_date`, `find_free_slots_for_date`, `create_appointment_event`.
+* `extract_json`: lightweight JSON extraction from model responses (expects the LLM to return JSON when asked to call functions).
+* `_heuristic_parse_date`: quick deterministic fallback for common words/dates (today, tomorrow, weekdays, numeric patterns).
+* `_find_available_slots`: calls calendar function, converts results to human-friendly `HH:MM-HH:MM` tuples and sets `self.available_slots`.
+* `_handle_booking_creation`: finalizes booking by calling `create_appointment_event` and returns a success/failure message.
+
+### Important behavior notes
+
+* The agent uses the LLM for date parsing and extracting booking details, but it always calls deterministic calendar functions to read/write the calendar.
+* After a successful booking the agent calls `reset()` which returns it to `idle` and clears context.
+* If the LLM fails to return expected JSON or actions, the agent falls back to generating conversational prompts to ask the user for missing information.
+
+---
+
+## Running the Streamlit UI
+
+`doctor-agent-UI.py` is a demo UI to simulate chat with the BookingAgent and to present available slots as clickable items.
+
+Run it with:
 
 ```bash
-pip install -r requirements.txt
+streamlit run doctor-agent-UI.py
 ```
 
-If any of these are missing, install manually:
+The UI should:
 
-```bash
-pip install langchain-ollama google-api-python-client \
-            google-auth-httplib2 google-auth-oauthlib python-dotenv
-```
+* Display conversational history
+* Let a user choose a suggested time slot (the UI can set `context['time_str']` accordingly)
+* Forward chat text to the agent and render agent replies
 
 ---
 
-# **4. Install & Run Ollama**
+## Prompts and LLM behavior
 
-### **Install Ollama**
+All prompt templates used to parse dates, request slots, and collect booking details are in `LLM_prompts.py`.
 
-Follow the official instructions:
-[https://ollama.com/download](https://ollama.com/download)
+Design notes for LLM prompts:
 
-### **Pull the Llama3.2 Model**
-
-```bash
-ollama pull llama3.2
-```
-
-### **Start Ollama Server**
-
-(Usually starts automatically)
-
-```bash
-ollama serve
-```
-
-Verify it's running:
-
-```bash
-curl http://localhost:11434/v1/models
-```
+* Keep the LLM's role focused (date parsing, slot-finding, or extracting patient info).
+* When you want the LLM to return structured data or call functions, instruct it to return strict JSON and provide a schema example.
+* Always have deterministic fallback code paths (`_heuristic_parse_date` and regex heuristics) when the LLM returns malformed JSON.
 
 ---
 
-# **5. Configure Google Calendar API**
+## calendar_functions.py expectations
 
-### **How to set it up:**
+`find_free_slots_for_date(service, calendar_id, date_str, ...)` should:
 
-1. Go to: [https://console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials)
-2. Create **OAuth Client ID** (Desktop App) or **Service Account**.
-3. Enable the **Google Calendar API**.
-4. Download the credential file.
-5. Save it as:
+* Query the Calendar API for events on the given date
+* Return a structure where the third element (index `2`) is a list of `(start_datetime, end_datetime)` tuples that represent free slots, which `BookingAgent.parse_time_slots_as_tuples` expects.
 
-```
-./LLM_agent/client_secret.json
-```
+`create_appointment_event(service, calendar_id, patient_name, date_str, time_str, description)` should:
 
-> **Important:**
-> Your calendar must be accessible using that credential (shared or owned).
+* Create a Calendar event on the requested date/time and return the created event object or raise an error.
+
+Adjust signatures and return formats if your `calendar_functions.py` uses slightly different shapes — update `parse_time_slots_as_tuples` accordingly.
 
 ---
 
-# **6. Run the Agent**
+## Example conversation flow
 
-The main script includes a simulation test.
-To run it:
-
-```bash
-python conversational_agent_patched.py
-```
-
-You’ll see a test conversation:
-
-```
-Hello!
-I want to find free slots for 2025-11-25
-...
-```
-
-To use it interactively, import it in a Python REPL:
-
-```python
-from conversational_agent_patched import conversational_run_agent
-
-ctx = {"pending_action": None, "args": {}, "history": [], "available_slots": []}
-
-reply, ctx = conversational_run_agent("Find available slots for 2025-11-25", ctx)
-print(reply)
-```
-
-Pass the **same `ctx`** into each call to maintain conversation memory.
+1. User: "Do you have any slots tomorrow morning?"
+2. Agent detects scheduling intent → `awaiting_date` → parse date (LLM or heuristics) → call `find_free_slots_for_date`.
+3. Agent replies with a compact list of available times and asks the user to choose.
+4. User: "Let's do 09:30–10:00"
+5. Agent marks `context['time_str']` and moves to booking creation, asking for name/reason if not provided.
+6. Agent calls `create_appointment_event` and confirms success or reports failure.
 
 ---
 
-# **7.Run with Streamlit (Locally)**
+## Testing and debugging
 
-Run:
-
-```bash
-streamlit run last_stream.py
-```
-
-> **Note:** Streamlit Cloud cannot access your local Ollama.
-> So Streamlit UI is **local only**, unless you host Ollama on a remote machine.
+* Use prints and logs in the agent (`print(f"DEBUG: ...")`) to trace state transitions and LLM raw outputs.
+* Provide deterministic tests by mocking LLM responses and calendar function outputs.
+* Validate `extract_json` behavior with varied LLM responses (multiline JSON, extra commentary around JSON, missing JSON).
 
 ---
 
-# **📂 Project Structure**
+## Extending this agent
 
-```
-📁 project/
-│
-├── run.py        # Main conversational agent (LLM + rules + calendar logic)
-├── calendar_functions.py          # Calendar helper utilities (find slot logic, booking helpers)
-├── google_apis.py                 # Google Calendar API service construction + auth handling
-├── stream_run.py                  # Optional Streamlit UI to run the agent locally
-│
-├── requirements.txt               # Python dependencies
-├── client_secret.json             # Google API OAuth/Service Account credentials (DO NOT COMMIT)
-│
-└── README.md
-
-```
+* Add timezone-aware handling (store timezone in calendar calls and normalize all datetimes).
+* Implement a richer `slots_found` flow where the user can ask for "earlier/later", or the agent can propose next-best slots.
+* Add authentication and user profiles so returning patients can book without re-entering name/details.
+* Persist conversation logs and booking metadata for analytics and audit.
 
 ---
 
-# **❗Troubleshooting**
+## Security and privacy
 
-### **1. Error: “Cannot attend all appointments”**
-
-This comes from Google Calendar. Check:
-
-* Calendar permissions
-* Date/time format
-* Timezone settings
-* Whether working hours block everything
-* Conflicts with existing events
+* Never commit `client_secret.json` or token files to source control.
+* If deployed publicly, secure OAuth client secrets in environment variables or a secrets manager.
+* You are writing medical appointment data to a calendar — make sure you comply with local privacy regulations (HIPAA, GDPR etc.) when storing protected health information.
 
 ---
 
-# **✔️ This project is designed for local-first AI**
+## Contributing
 
-Perfect for:
-
-* private scheduling systems
-* offline assistants
-* experimenting with LLM reasoning + rule-based logic
-* building medical/clinic automation prototypes
-
----
-
-
-https://github.com/user-attachments/assets/e3049e47-8350-496a-b0b3-6c78afa1bf16
-
-
-* The demo was performed by opening Google Calendar without the location access with a VPN, therefore the timeline alters, otherwise if you open your phone and check, the appointment is booked for the right slot
-
+Feel free to open issues or pull requests. For changes to calendar behavior, include unit tests that mock Google Calendar responses.
