@@ -167,3 +167,10 @@ Adjust signatures and return formats if your `calendar_functions.py` uses slight
 ## Contributing
 
 Feel free to open issues or pull requests. For changes to calendar behavior, include unit tests that mock Google Calendar responses.
+
+## Demo
+
+
+https://github.com/user-attachments/assets/8f0ed289-68ea-4e71-a464-80e719d7547a
+
+
